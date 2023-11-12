@@ -1,0 +1,109 @@
+version: "2.4"
+
+volumes:
+  data:
+  extensions:
+  db:
+
+services:
+  freshrss:
+    image: freshrss/freshrss:edge
+    # Optional build section if you want to build the image locally:
+    build:
+      # Pick #latest (stable release) or #edge (rolling release) or a specific release like #1.21.0
+      context: https://github.com/FreshRSS/FreshRSS.git#edge
+      dockerfile: Docker/Dockerfile-Alpine
+    container_name: freshrss
+    restart: unless-stopped
+    logging:
+      options:
+        max-size: 10m
+    volumes:
+      # Recommended volume for FreshRSS persistent data such as configuration and SQLite databases
+      - data:/var/www/FreshRSS/data
+      # Optional volume for storing third-party extensions
+      - extensions:/var/www/FreshRSS/extensions
+      # Optional file providing custom global settings (used before a FreshRSS install)
+      # - ./config.custom.php:/var/www/FreshRSS/data/config.custom.php
+      # Optional file providing custom user settings (used before a new user is created)
+      # - ./config-user.custom.php:/var/www/FreshRSS/data/config-user.custom.php
+    ports:
+      # If you want to open a port 8080 on the local machine:
+      - 50010:80
+    depends_on:
+      freshrss-db:
+        condition: service_healthy
+    environment:
+      # A timezone http://php.net/timezones (default is UTC)
+      TZ: America/Sao_Paulo
+      # Cron job to refresh feeds at specified minutes
+      CRON_MIN: '2,32'
+      # 'development' for additional logs; default is 'production'
+      FRESHRSS_ENV: development
+      # Optional advanced parameter controlling the internal Apache listening port
+      LISTEN: 0.0.0.0:80
+      # Optional parameter, remove for automatic settings, set to 0 to disable,
+      # or (if you use a proxy) to a space-separated list of trusted IP ranges
+      # compatible with https://httpd.apache.org/docs/current/mod/mod_remoteip.html#remoteipinternalproxy
+      # This impacts which IP address is logged (X-Forwarded-For or REMOTE_ADDR).
+      # This also impacts external authentication methods;
+      # see https://freshrss.github.io/FreshRSS/en/admins/09_AccessControl.html
+      TRUSTED_PROXY: 0 # 172.16.0.1/12 192.168.0.1/16
+      # Optional parameter, set to 1 to enable OpenID Connect (only available in our Debian image)
+      # Requires more environment variables. See https://freshrss.github.io/FreshRSS/en/admins/16_OpenID-Connect.html
+      OIDC_ENABLED: 0
+      # Optional auto-install parameters (the Web interface install is recommended instead):
+      # ⚠️ Parameters below are only used at the very first run (so far).
+      # So if changes are made (or in .env file), first delete the service and volumes.
+      # ℹ️ All the --db-* parameters can be omitted if using built-in SQLite database.
+      FRESHRSS_INSTALL: |-
+        --db-base freshrss
+        --db-host freshrss-db
+        --db-password ${DB_PASSWORD:-freshrss}
+        --db-type pgsql
+        --db-user ${DB_USER:-freshrss}
+        --default_user admin
+        --language en
+#        --api_enabled
+#        --base_url ${BASE_URL}
+      FRESHRSS_USER: |-
+        --language en
+        --password ${ADMIN_PASSWORD:-admin}
+        --user ${ADMIN_USER:-admin}
+#        --api_password ${ADMIN_API_PASSWORD}
+#        --email ${ADMIN_EMAIL}
+
+  full-text-rss:
+    image: heussd/fivefilters-full-text-rss:latest
+    container_name: full-text-rss
+    restart: always
+    ports:
+      - 50020:80
+  freshrss-db:
+    image: postgres:16
+    container_name: freshrss-db
+    hostname: freshrss-db
+    restart: unless-stopped
+    logging:
+      options:
+        max-size: 10m
+    volumes:
+      - db:/var/lib/postgresql/data
+    environment:
+      TZ: BR
+      POSTGRES_DB: freshrss
+      POSTGRES_USER: ${DB_USER:-freshrss}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-freshrss}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d 'user=${DB_USER:-freshrss} dbname=freshrss host=localhost port=5432'"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    command:
+      # Examples of PostgreSQL tuning.
+      # https://wiki.postgresql.org/wiki/Tuning_Your_PostgreSQL_Server
+      # When in doubt, skip and stick to default PostgreSQL settings.
+      - -c
+      - shared_buffers=1GB
+      - -c
+      - work_mem=32MB
