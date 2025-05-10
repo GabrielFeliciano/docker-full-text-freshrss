@@ -101,7 +101,7 @@ services:
       # https://wiki.postgresql.org/wiki/Tuning_Your_PostgreSQL_Server
       # When in doubt, skip and stick to default PostgreSQL settings.
       - -c
-      - shared_buffers=300mb
+      - shared_buffers=300MB
       - -c
       - work_mem=32MB
 
