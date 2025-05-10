@@ -26,7 +26,7 @@ services:
       # - ./config-user.custom.php:/var/www/FreshRSS/data/config-user.custom.php
     ports:
       # If you want to open a port 8080 on the local machine:
-      - 50010:80
+      - 80:80
     depends_on:
       freshrss-db:
         condition: service_healthy
@@ -104,3 +104,4 @@ services:
       - shared_buffers=1GB
       - -c
       - work_mem=32MB
+
