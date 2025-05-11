@@ -27,4 +27,8 @@ RUN git clone --branch master https://github.com/FreshRSS/Extensions.git ./offic
     git checkout 8cebb26c3d3bce7c629cf86d08e665ef9623d22a && \
     mv ./xExtension-* ../
 
+# Give permissions to www-data
+RUN chown www-data:www-data -R /var/www/FreshRSS/extensions
+RUN chmod g+rx /var/www/FreshRSS/extensions
+
 WORKDIR /var/www/FreshRSS
